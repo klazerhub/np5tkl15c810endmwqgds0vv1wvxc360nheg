@@ -1,0 +1,1708 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<!-- Мобильная адаптация: ширина = ширина экрана, поддержка "чубчика" (выреза) -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<!-- Цвет верхней панели браузера на Android -->
+<meta name="theme-color" content="#0B1026" />
+<title>🌛Твой идеальный сон</title>
+
+<!-- Шрифт Inter (подключаем только нужные начертания) -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+<style>
+  /* ============ БАЗА (сброс + типографика) ============ */
+  *, *::before, *::after { box-sizing: border-box; }   /* padding/border не увеличивают ширину */
+  html, body { margin: 0; padding: 0; }
+
+  :root {
+    /* ---- ЦВЕТА (единая палитра, меняется тут — обновляется везде) ---- */
+    --bg-deep:   #0B1026;   /* глубокий фон приложения */
+    --bg-card:   #151E3F;   /* фон карточек */
+    --accent:    #F4E4BC;   /* акцент (луна, CTA, активные элементы) */
+    --detail:    #8A95C0;   /* второстепенный цвет (звёзды, иконки) */
+    --text:      #C5CAE9;   /* основной текст */
+    --text-70:   rgba(197, 202, 233, .70);  /* текст 70% прозрачности */
+    --text-45:   rgba(197, 202, 233, .45);  /* текст 45% прозрачности */
+    --stroke:    rgba(138, 149, 192, .18);  /* граница элементов */
+    --stroke-soft: rgba(138, 149, 192, .10);/* мягкая граница */
+    --ease: cubic-bezier(.22, .9, .28, 1);  /* единая кривая анимаций */
+
+    /* ---- ГЕОМЕТРИЯ КОЛЕСА ВРЕМЕНИ ---- */
+    --item-h: 50px;    /* высота одной строки (часа/минуты) */
+    --wheel-h: 190px;  /* высота всего колеса */
+
+    /* ---- ДЕКОР У ЗАГОЛОВКА (луна и Zzz) ---- */
+    --moon-size: clamp(46px, 13vw, 52px);         /* адаптивный размер луны */
+    --header-gutter: calc(var(--moon-size) + 6px);/* отступы текста заголовка от декора */
+  }
+
+  html { -webkit-text-size-adjust: 100%; } /* запрет автозума текста на iOS при повороте */
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg-deep);
+    color: var(--text);
+    min-height: 100dvh;      /* корректная высота на мобильных (с учётом адресной строки) */
+    overflow-x: hidden;      /* запрет горизонтального скролла */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent; /* убираем серую подсветку тапов на iOS/Android */
+  }
+
+  button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; } /* без двойного тапа-зума */
+
+  /* ============ НЕБО / ФОН (декоративный градиент + свечения) ============ */
+  .sky {
+    position: fixed;   /* фон не прокручивается вместе с контентом */
+    inset: 0;          /* top/right/bottom/left = 0 */
+    z-index: 0;        /* за контентом */
+    overflow: hidden;
+    background: linear-gradient(to bottom, #151E3F 0%, #111838 42%, #0B1026 100%);
+  }
+  /* Мягкие цветные блики поверх градиента */
+  .sky::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(60% 42% at 82% 6%,  rgba(244, 228, 188, .10), transparent 62%), /* тёплый блик сверху справа */
+      radial-gradient(72% 52% at 10% 92%, rgba(90, 120, 220, .10), transparent 66%),  /* синий блик снизу слева */
+      radial-gradient(58% 42% at 50% 46%, rgba(90, 120, 220, .09), transparent 72%);  /* синий блик по центру */
+    pointer-events: none; /* клики сквозь фон */
+  }
+
+  /* Обёртки для слоёв звёзд (3 слоя для параллакса) */
+  .stars {
+    position: absolute;
+    inset: -6%;        /* чуть больше экрана, чтобы был запас при параллаксе */
+    will-change: transform; /* подсказка браузеру вынести в отдельный слой */
+  }
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    background: var(--detail);
+    animation: twinkle 3s ease-in-out infinite; /* мерцание */
+  }
+  /* Мерцание: плавное изменение прозрачности и размера */
+  @keyframes twinkle {
+    0%, 100% { opacity: .14; transform: scale(.8); }
+    50%      { opacity: 1;   transform: scale(1.15); }
+  }
+
+  /* ============ КАРКАС (обёртка + центрирование контента) ============ */
+  .app {
+    position: relative;
+    z-index: 2;                /* выше фона-неба */
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    /* Учитываем "чубчик" и жестовую панель iOS/Android */
+    padding-top: max(22px, env(safe-area-inset-top));
+    padding-bottom: max(30px, env(safe-area-inset-bottom));
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+
+  .screen {
+    display: none;             /* скрыт по умолчанию */
+    width: 100%;
+    max-width: 420px;          /* максимальная ширина колонки контента */
+    margin: auto;              /* центрирование по вертикали и горизонтали */
+  }
+  .screen.active { display: block; } /* активный экран показывается */
+
+  /* Универсальная анимация появления экрана (снизу + лёгкий зум) */
+  @keyframes screenIn {
+    from { opacity: 0; transform: translateY(18px) scale(.99); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* Экран 1: каждый прямой потомок появляется по очереди (сверху вниз) */
+  #screenInput.active > * {
+    animation: screenIn .6s var(--ease) both;
+  }
+  #screenInput.active > *:nth-child(1) { animation-delay: .24s; } /* header */
+  #screenInput.active > *:nth-child(2) { animation-delay: .31s; } /* segmented */
+  #screenInput.active > *:nth-child(3) { animation-delay: .38s; } /* picker */
+  #screenInput.active > *:nth-child(4) { animation-delay: .45s; } /* cycles */
+  #screenInput.active > *:nth-child(5) { animation-delay: .51s; } /* cycles-hint */
+  #screenInput.active > *:nth-child(6) { animation-delay: .57s; } /* toggle */
+  #screenInput.active > *:nth-child(7) { animation-delay: .68s; } /* cta */
+
+  /* Стеклянная карточка (эффект матового стекла) */
+  .glass {
+    background: linear-gradient(160deg, rgba(21, 30, 63, .78), rgba(21, 30, 63, .42));
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid var(--stroke);
+    border-radius: 24px;
+    box-shadow: 0 10px 34px rgba(0, 0, 0, .34), inset 0 1px 0 rgba(197, 202, 233, .06);
+  }
+
+  /* ============ ЭКРАН 1: ЗАГОЛОВОК + ДЕКОР (луна, Zzz) ============ */
+  .header {
+    position: relative;                     /* база для абсолютных луны и Zzz */
+    margin-bottom: 22px;
+    padding: clamp(12px, 3.6vw, 20px) 0;
+  }
+  .header-text {
+    position: relative;
+    z-index: 2;                             /* текст выше декора по слоям */
+    text-align: center;
+    padding: 0 var(--header-gutter);        /* отступы под декор слева и справа */
+  }
+  .header h1 {
+    margin: 0;
+    font-size: clamp(16px, 5.2vw, 24px);    /* адаптивный размер заголовка */
+    font-weight: 600;
+    letter-spacing: -.025em;
+    line-height: 1.15;
+    white-space: nowrap;                    /* строго одна строка */
+    color: rgba(197, 202, 233, .96);
+  }
+
+  /* --- Луна: справа от заголовка --- */
+  .moon-wrap {
+    position: absolute;
+    top: 50%;                               /* вертикальное центрирование */
+    right: 0;
+    z-index: 1;
+    width: var(--moon-size);
+    height: var(--moon-size);
+    transform: translateY(-50%);
+    pointer-events: none;                   /* не перехватывает тапы */
+    animation: moonIn 1s var(--ease) 0.5s both;
+  }
+  .moon {
+    display: block;
+    width: 90%;
+    height: 90%;
+    border-radius: 50%;
+    /* Радиальный градиент — тёплая "лунная" поверхность */
+    background: radial-gradient(circle at 34% 30%, #FDF6E3, #F4E4BC 52%, #E0CB9C 100%);
+    /* Маска вырезает "полумесяц" — область справа сверху прозрачная */
+    -webkit-mask: radial-gradient(circle at 74% 26%, transparent 46%, #000 47%);
+            mask: radial-gradient(circle at 74% 26%, transparent 46%, #000 47%);
+    transform-origin: 50% 50%;
+    animation:
+      moonGlow  7s  ease-in-out infinite 3.2s,  /* свечение */
+      moonShake 10s ease-in-out infinite 4s;    /* лёгкая "тряска" */
+  }
+
+  /* Появление луны — только по прозрачности */
+  @keyframes moonIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  /* Пульсирующее свечение луны */
+  @keyframes moonGlow {
+    0%, 100% { filter: drop-shadow(0 0 22px rgba(244, 228, 188, .26)); }
+    50%      { filter: drop-shadow(0 0 42px rgba(244, 228, 188, .46)); }
+  }
+  /* Лёгкое покачивание (вертикальное — финальная версия в источнике) */
+  @keyframes moonShake {
+    0%   { transform: translateY(0)      rotate(0deg); }
+    2%   { transform: translateY(-2px)   rotate(-2.2deg); }
+    4%   { transform: translateY(2px)    rotate(2.2deg); }
+    6%   { transform: translateY(-1.5px) rotate(-1.8deg); }
+    8%   { transform: translateY(1.5px)  rotate(1.8deg); }
+    10%  { transform: translateY(0)      rotate(0deg); }
+    100% { transform: translateY(0)      rotate(0deg); }
+  }
+
+  /* --- Zzz: буквы "Z" слева от заголовка (улетают вверх) --- */
+  .zzz {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    z-index: 1;
+    width: var(--moon-size);
+    height: var(--moon-size);
+    transform: translateY(-50%);
+    pointer-events: none;
+    font-weight: 600;
+    animation: moonIn .9s var(--ease) .35s both;
+  }
+  .zzz span {
+    position: absolute;
+    left: 62%;
+    top: 62%;
+    color: rgba(244, 228, 188, .58);
+    opacity: 0;
+    text-shadow: 0 0 14px rgba(244, 228, 188, .38);
+    animation: floatZ 3.6s ease-in-out infinite;
+  }
+  /* Три буквы разного размера, летят по очереди (см. animation-delay) */
+  .zzz span:nth-child(1) { font-size: calc(var(--moon-size) * .18); animation-delay: 0s; }
+  .zzz span:nth-child(2) { font-size: calc(var(--moon-size) * .24); animation-delay: 1.15s; }
+  .zzz span:nth-child(3) { font-size: calc(var(--moon-size) * .32); animation-delay: 2.3s; }
+
+  /* Полёт буквы Z: плавное появление, подъём вверх-влево и исчезновение */
+  @keyframes floatZ {
+    0%   { opacity: 0;   transform: translate(0, 8px) scale(.7); }
+    15%  { opacity: .19; }
+    70%  { opacity: .52; }
+    100% { opacity: 0;   transform: translate(-10px, -38px) scale(1.12); }
+  }
+
+  /* ============ СЕГМЕНТЫ (переключатель "Пробуждение / Отбой") ============ */
+  .segmented {
+    position: relative;                    /* для абсолютного seg-thumb */
+    display: flex;
+    padding: 4px;
+    margin-bottom: 20px;
+    border-radius: 18px;
+    background: rgba(21, 30, 63, .55);
+    border: 1px solid var(--stroke-soft);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+  /* "Ползунок" под активной кнопкой — плавно ездит влево/вправо */
+  .seg-thumb {
+    position: absolute;
+    top: 4px; left: 4px;
+    width: calc(50% - 4px);                /* половина минус паддинги */
+    height: calc(100% - 8px);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(244, 228, 188, .16), rgba(244, 228, 188, .05));
+    border: 1px solid rgba(244, 228, 188, .22);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, .28), inset 0 1px 0 rgba(244, 228, 188, .14);
+    transition: transform .42s var(--ease); /* плавный переход между позициями */
+    pointer-events: none;
+  }
+  /* Кнопки-сегменты (половинки) */
+  .seg {
+    position: relative;
+    z-index: 1;                            /* над ползунком */
+    flex: 1;                               /* равная ширина */
+    min-width: 0;
+    padding: 11px 8px;
+    border: 0;
+    border-radius: 14px;
+    background: none;
+    font: inherit;
+    font-size: clamp(11px, 3.3vw, 12.5px);
+    font-weight: 500;
+    letter-spacing: -.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;               /* обрезаем длинный текст "..." */
+    color: var(--text-45);                 /* неактивное состояние */
+    cursor: pointer;
+    transition: color .3s ease;
+  }
+  .seg.active { color: var(--accent); }    /* активное состояние — акцентный цвет */
+
+  /* ============ КОЛЕСО ВРЕМЕНИ (часы и минуты) ============ */
+  /* Контейнер-«таблетка» вокруг колёс: сужен до содержимого,
+     чтобы окно было оптимально настроено только под колесо */
+  .picker {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;                    /* ширина по содержимому (часы + : + минуты) */
+    margin: 0 auto 20px;                   /* центрируем по горизонтали, отступ снизу как раньше */
+    padding: 4px 48px;                      /* узкие внутренние паддинги — окно плотно облегает колесо */
+    border-radius: 26px;
+    background: rgba(21, 30, 63, .2);      /* как у .cycle */
+    border: 1px solid var(--stroke-soft);
+    backdrop-filter: blur(14px);           /* было 18px — теперь как у циклов */
+    -webkit-backdrop-filter: blur(14px);
+    overflow: hidden;
+  }
+  /* Центральная подсвеченная полоса — показывает выбранное значение */
+  .picker::before {
+    content: '';
+    position: absolute;
+    left: 8px; right: 8px;                 /* отступ подсветки = паддингу окна */
+    top: 50%;
+    height: var(--item-h);
+    transform: translateY(-50%);
+    border-radius: 14px;
+    background: linear-gradient(90deg, rgba(244, 228, 188, .04), rgba(244, 228, 188, .04), rgba(244, 228, 188, .04));
+    border-top: 1px solid rgba(244, 228, 188, .16);
+    border-bottom: 1px solid rgba(244, 228, 188, .16);
+    pointer-events: none;
+  }
+
+  /* Колонка колеса: степпер-стрелка сверху + колесо + степпер-стрелка снизу.
+     Вертикальный стек позволяет стрелкам быть над/под колесом, не расширяя окно. */
+  .wheel-col {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  /* Кнопки-степперы (стрелки вверх/вниз над и под колесом) */
+  .step-btn {
+    width: 44px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: rgba(244, 228, 188, .42);       /* приглушённый акцент по умолчанию */
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    transition: color .22s ease, transform .18s var(--ease), background .22s ease;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;            /* без двойного тапа-зума */
+  }
+  .step-btn:hover {
+    color: rgba(244, 228, 188, .9);        /* подсветка при наведении */
+    background: rgba(244, 228, 188, .05);
+  }
+  .step-btn:active {
+    color: var(--accent);
+    transform: scale(.9);                  /* тактильный отклик на нажатие */
+  }
+  .step-btn svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+    pointer-events: none;                  /* клики идут по кнопке, а не по svg */
+  }
+
+  /* Само колесо — скроллящийся список со "снапом" по центру */
+  .wheel {
+    position: relative;
+    z-index: 1;
+    width: 96px;
+    max-width: 30vw;
+    height: var(--wheel-h);
+    /* Сверху/снизу оставляем отступы, чтобы крайние элементы можно было отцентрировать */
+    padding: calc((var(--wheel-h) - var(--item-h)) / 2) 0;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;         /* "магнит" к центру при прокрутке */
+    overscroll-behavior: contain;          /* не "прокручивать" страницу за краем */
+    scrollbar-width: none;                 /* Firefox: спрятать скроллбар */
+    -ms-overflow-style: none;              /* IE/Edge */
+    -webkit-overflow-scrolling: touch;     /* плавный инерционный скролл на iOS */
+    touch-action: pan-y;                   /* только вертикальный жест */
+    cursor: grab;                          /* подсказка: можно тянуть мышью */
+    /* Градиентные маски сверху/снизу — края колеса плавно исчезают */
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 78%, transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 78%, transparent 100%);
+  }
+  .wheel::-webkit-scrollbar { display: none; } /* Chrome/Safari: спрятать скроллбар */
+
+  /* Состояние перетаскивания мышью: курсор "grabbing", отключаем snap на время drag */
+  .wheel.dragging {
+    cursor: grabbing;
+    scroll-snap-type: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Одна строка колеса (например, "07") */
+  .wheel-item {
+    height: var(--item-h);
+    line-height: var(--item-h);
+    text-align: center;
+    font-size: clamp(25px, 7.6vw, 30px);
+    font-weight: 600;
+    letter-spacing: -.03em;
+    font-variant-numeric: tabular-nums;    /* моноширинные цифры (нет "прыжков") */
+    color: rgba(197, 202, 233, .28);       /* неактивные — тусклые */
+    scroll-snap-align: center;             /* привязка к центру контейнера */
+    transform: scale(.78);                 /* неактивные — чуть меньше */
+    transition: color .3s ease, transform .3s ease, text-shadow .3s ease;
+    cursor: inherit;                       /* наследуем grab/grabbing от .wheel */
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  /* Активный (центральный) элемент колеса */
+  .wheel-item.active {
+    color: var(--accent);
+    transform: scale(1);
+    text-shadow: 0 0 22px rgba(244, 228, 188, .45);
+  }
+
+  /* Двоеточие между часами и минутами */
+  .colon {
+    position: relative;
+    z-index: 1;
+    margin: 0 2px;
+    font-size: clamp(24px, 7vw, 28px);
+    font-weight: 600;
+    color: rgba(244, 228, 188, .6);
+    animation: colonPulse 2.8s ease-in-out infinite; /* мягкое мигание */
+  }
+  @keyframes colonPulse {
+    0%, 100% { opacity: .3; }
+    50%      { opacity: .95; }
+  }
+
+  /* ============ ЦИКЛЫ (4 / 5 / 6) ============ */
+  .cycles { display: flex; gap: 10px; margin-bottom: 10px; }
+  .cycle {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 12px 6px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--stroke-soft);
+    background: rgba(21, 30, 63, .5);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    transition: background .35s var(--ease), border-color .35s var(--ease), box-shadow .35s var(--ease), transform .25s var(--ease);
+  }
+  .cycle:active { transform: scale(.97); } /* лёгкое нажатие */
+
+  /* Число цикла (4/5/6) */
+  .cycle-num {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -.02em;
+    color: var(--text-70);
+    transition: color .3s ease, text-shadow .3s ease;
+  }
+  /* Подпись под числом ("МИНИМУМ"/"ОПТИМАЛЬНО"/"ИДЕАЛЬНО") */
+  .cycle-label {
+    font-size: 9.5px;
+    font-weight: 500;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--text-45);
+    transition: color .3s ease;
+  }
+  /* Активная кнопка цикла — акцентное свечение */
+  .cycle.active {
+    background: linear-gradient(160deg, rgba(244, 228, 188, .14), rgba(244, 228, 188, .035));
+    border-color: rgba(244, 228, 188, .34);
+    box-shadow: 0 6px 26px rgba(244, 228, 188, .10), inset 0 1px 0 rgba(244, 228, 188, .16);
+  }
+  .cycle.active .cycle-num { color: var(--accent); text-shadow: 0 0 18px rgba(244, 228, 188, .42); }
+  .cycle.active .cycle-label { color: rgba(244, 228, 188, .72); }
+
+  /* Пояснение под кнопками ("5 циклов × 90 мин · 7 ч 30 мин сна") */
+  .cycles-hint {
+    margin: 0 0 18px;
+    text-align: center;
+    font-size: 12px;
+    letter-spacing: .01em;
+    color: var(--text-45);
+  }
+  .cycles-hint b { color: rgba(197, 202, 233, .82); font-weight: 500; }
+
+  /* ============ ТОГГЛ «+ 15 мин на засыпание» ============ */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    margin-bottom: 22px;
+    padding: 14px 18px;
+    border-radius: 20px;
+    border: 1px solid var(--stroke-soft);
+    background: rgba(21, 30, 63, .5);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    font: inherit;
+    font-size: 13.5px;
+    line-height: 1.25;
+    color: var(--text-70);
+    text-align: left;
+    cursor: pointer;
+    transition: background .3s ease, border-color .3s ease;
+  }
+  .toggle-row:hover { border-color: var(--stroke); }
+
+  /* Сам переключатель (визуально — "пилюля" с кружком) */
+  .switch {
+    position: relative;
+    flex: 0 0 auto;
+    width: 46px;
+    height: 27px;
+    border-radius: 99px;
+    background: rgba(138, 149, 192, .16);
+    border: 1px solid rgba(138, 149, 192, .22);
+    transition: background .35s var(--ease), border-color .35s var(--ease), box-shadow .35s var(--ease);
+  }
+  /* Кружок-бегунок внутри переключателя */
+  .switch::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 19px; height: 19px;
+    border-radius: 50%;
+    background: var(--detail);
+    transition: transform .35s var(--ease), background .35s var(--ease);
+  }
+  /* Включенное состояние (aria-pressed="true") */
+  .toggle-row[aria-pressed="true"] .switch {
+    background: linear-gradient(135deg, rgba(244, 228, 188, .85), rgba(224, 201, 143, .7));
+    border-color: rgba(244, 228, 188, .55);
+    box-shadow: 0 0 22px rgba(244, 228, 188, .25);
+  }
+  /* Бегунок уезжает вправо, становится тёмным */
+  .toggle-row[aria-pressed="true"] .switch::after {
+    transform: translateX(19px);
+    background: #0B1026;
+  }
+
+  /* ============ CTA (главная кнопка "Навстречу новому дню") ============ */
+  .cta {
+    width: 100%;
+    padding: 19px;
+    border: 0;
+    border-radius: 18px;
+    font: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+    color: #0B1026;                        /* тёмный текст на светлой кнопке */
+    background: linear-gradient(135deg, #F9EFD4 0%, #F4E4BC 42%, #DCC190 100%);
+    box-shadow: 0 10px 34px rgba(244, 228, 188, .22), inset 0 1px 0 rgba(255, 255, 255, .45);
+    cursor: pointer;
+    transition: transform .25s var(--ease), box-shadow .25s var(--ease);
+  }
+  .cta:hover { transform: translateY(-2px); box-shadow: 0 16px 42px rgba(244, 228, 188, .30), inset 0 1px 0 rgba(255, 255, 255, .55); }
+  .cta:active { transform: translateY(0) scale(.985); }
+
+  /* ============ ЭКРАН 2 (результат) ============ */
+  .reveal { animation: screenIn .65s var(--ease) both; } /* появление каждого блока */
+
+  /* Блок с крупным временем и подписью */
+  .hero { text-align: center; margin-bottom: 20px; }
+  .hero-time {
+    font-size: clamp(48px, 15vw, 64px);
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -.045em;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+    animation: heroPulse 4.2s ease-in-out infinite; /* мягкое свечение */
+  }
+  @keyframes heroPulse {
+    0%, 100% { text-shadow: 0 0 34px rgba(244, 228, 188, .28), 0 0 72px rgba(244, 228, 188, .10); }
+    50%      { text-shadow: 0 0 54px rgba(244, 228, 188, .48), 0 0 104px rgba(244, 228, 188, .20); }
+  }
+  .hero-label {
+    margin: 12px 0 0;
+    font-size: 14px;
+    line-height: 1.35;
+    color: var(--text-70);
+  }
+  /* "Чип" под подписью — вторичное время (отбой/пробуждение) */
+  .hero-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 8px 16px;
+    border-radius: 99px;
+    background: rgba(21, 30, 63, .62);
+    border: 1px solid var(--stroke);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    font-size: 12.5px;
+    color: var(--text-45);
+  }
+  .hero-chip b { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* Карточка трекера циклов сна */
+  .tracker-card { padding: 18px 20px 14px; margin-bottom: 12px; }
+  .tracker { display: flex; align-items: center; margin-bottom: 12px; }
+
+  /* Точка = один цикл сна */
+  .track-dot {
+    flex: 0 0 auto;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--detail);
+    box-shadow: 0 0 12px rgba(138, 149, 192, .65);
+    animation: dotIn .5s var(--ease) both;
+  }
+  /* Последняя (финальная) точка — акцентная и пульсирующая */
+  .track-dot.final {
+    width: 14px; height: 14px;
+    background: var(--accent);
+    animation: dotIn .5s var(--ease) both,
+               finalPulse 2.4s ease-in-out infinite .6s;
+  }
+  @keyframes dotIn {
+    from { opacity: 0; transform: scale(.25); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @keyframes finalPulse {
+    0%, 100% { box-shadow: 0 0 16px rgba(244, 228, 188, .60), 0 0 32px rgba(244, 228, 188, .22); }
+    50%      { box-shadow: 0 0 28px rgba(244, 228, 188, .95), 0 0 58px rgba(244, 228, 188, .45); }
+  }
+  /* Линия-связка между точками */
+  .track-line {
+    flex: 1;
+    height: 2px;
+    margin: 0 3px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, rgba(138, 149, 192, .45), rgba(138, 149, 192, .18));
+    transform-origin: left center;      /* "вырастает" слева направо */
+    animation: lineIn .5s var(--ease) both;
+  }
+  @keyframes lineIn {
+    from { opacity: 0; transform: scaleX(0); }
+    to   { opacity: 1; transform: scaleX(1); }
+  }
+
+  /* Подпись под трекером */
+  .tracker-caption {
+    margin: 0;
+    text-align: center;
+    font-size: 12px;
+    letter-spacing: .02em;
+    color: var(--text-45);
+  }
+
+  /* ============ СОВЕТЫ (ЭКРАН 2) ============ */
+  /* Блок-секция совета: заголовок с иконкой + карточки под ним */
+  .tips-block {
+    margin-bottom: 12px;
+  }
+
+  /* Заголовок секции: маленькая иконка + капс-подпись */
+  .tips-heading {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0 4px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: rgba(197, 202, 233, .58);
+  }
+  .tips-heading-icon {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    background: linear-gradient(160deg, rgba(244, 228, 188, .16), rgba(138, 149, 192, .06));
+    border: 1px solid rgba(244, 228, 188, .16);
+    color: var(--accent);
+    flex: 0 0 auto;
+  }
+  .tips-heading-icon svg { width: 13px; height: 13px; display: block; }
+
+  /* Контейнер карточек-советов (внутри каждой секции) */
+  .cards { display: flex; flex-direction: column; gap: 8px; }
+
+  /* Карточка одного совета: заголовок + описание, без иконки
+     (иконка уже стоит в заголовке секции — так чище и легче) */
+  .tip-card {
+    padding: 13px 16px;
+    border-radius: 20px;
+  }
+  .tip-title {
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -.005em;
+    color: rgba(197, 202, 233, .95);
+    margin-bottom: 6px;
+  }
+  .tip-text {
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--text-45);
+  }
+  /* Второй и последующие абзацы внутри одной карточки — небольшой отступ */
+  .tip-text + .tip-text { margin-top: 6px; }
+
+  /* Кнопка "Рассчитать снова" (прозрачная) */
+  .ghost-btn {
+    width: 100%;
+    padding: 16px;
+    border-radius: 18px;
+    border: 1px solid var(--stroke);
+    background: rgba(21, 30, 63, .55);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: -.01em;
+    color: var(--text);
+    cursor: pointer;
+    transition: background .3s ease, border-color .3s ease, color .3s ease, transform .25s var(--ease);
+  }
+  .ghost-btn:hover {
+    background: rgba(21, 30, 63, .9);
+    border-color: rgba(244, 228, 188, .3);
+    color: var(--accent);
+  }
+  .ghost-btn:active { transform: scale(.985); }
+
+  /* Поочерёдное появление блоков экрана 2 (6 прямых потомков) */
+  #screenResult .reveal:nth-child(1) { animation-delay: .04s; } /* hero */
+  #screenResult .reveal:nth-child(2) { animation-delay: .10s; } /* tracker-card */
+  #screenResult .reveal:nth-child(3) { animation-delay: .18s; } /* tips-block evening */
+  #screenResult .reveal:nth-child(4) { animation-delay: .24s; } /* tips-block morning */
+  #screenResult .reveal:nth-child(5) { animation-delay: .30s; } /* tips-block secret */
+  #screenResult .reveal:nth-child(6) { animation-delay: .38s; } /* ghost-btn */
+
+  /* ============ АДАПТИВ: ВЫСОТА ============ */
+  /* Мало места по высоте — сжимаем колесо и отступы */
+  @media (max-height: 820px) {
+    :root { --wheel-h: 172px; }
+    .header { margin-bottom: 18px; }
+  }
+  @media (max-height: 740px) {
+    :root { --wheel-h: 154px; }
+    .header { margin-bottom: 14px; padding: clamp(10px, 3vw, 16px) 0; }
+    .picker { margin-bottom: 16px; }
+    .segmented { margin-bottom: 16px; }
+    .cycles-hint { margin-bottom: 14px; }
+    .toggle-row { margin-bottom: 16px; padding: 12px 16px; }
+    .cta { padding: 16px; }
+    .hero { margin-bottom: 16px; }
+    .hero-time { font-size: clamp(44px, 13vw, 56px); }
+    .tracker-card { padding: 16px 18px 12px; }
+    .tips-block { margin-bottom: 10px; }
+    .cards { gap: 6px; }
+    .tip-card { padding: 12px 15px; }
+    .ghost-btn { padding: 15px; }
+    .step-btn { height: 26px; }              /* чуть ниже стрелки на низких экранах */
+  }
+  /* Совсем низкий экран — скрываем подсказку, сжимаем всё */
+  @media (max-height: 660px) {
+    :root { --wheel-h: 136px; }
+    .header { margin-bottom: 12px; padding: 8px 0; }
+    .header h1 { font-size: clamp(15px, 4.8vw, 20px); }
+    .cycles-hint { display: none; }
+    .cycle { padding: 10px 5px 8px; }
+    .cycles { margin-bottom: 12px; }
+    .tip-title { font-size: 12.5px; }
+    .tip-text { font-size: 12px; }
+    .step-btn { height: 24px; }
+    .step-btn svg { width: 16px; height: 16px; }
+  }
+
+  /* ============ АДАПТИВ: ШИРИНА ============ */
+  @media (max-width: 380px) {
+    .wheel { width: 82px; }
+    .cycles { gap: 7px; }
+    .cycle-label { font-size: 8.5px; letter-spacing: .05em; }
+    .cycle-num { font-size: 18px; }
+    .toggle-row { font-size: 12.5px; padding: 12px 14px; }
+    .tip-card { padding: 12px 14px; }
+    .tip-text { font-size: 12px; }
+  }
+  /* Очень узкие экраны — сжимаем колесо */
+  @media (max-width: 330px) {
+    .picker::before { left: 6px; right: 6px; } /* подсветка прижата к новым узким паддингам */
+    .wheel { width: 74px; }
+  }
+
+  /* ============ УМЕНЬШЕННАЯ АНИМАЦИЯ (системная настройка a11y) ============ */
+  @media (prefers-reduced-motion: reduce) {
+    /* Отключаем почти все анимации и переходы */
+    *, *::before, *::after {
+      animation-duration: .001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .001ms !important;
+    }
+    .zzz span { opacity: .8 !important; transform: none !important; }
+    .star { opacity: .75 !important; }
+    #screenInput.active > * { opacity: 1 !important; transform: none !important; }
+  }
+</style>
+</head>
+
+<body>
+
+<!-- ============ ФОН: КОСМОС (3 слоя звёзд для параллакса) ============ -->
+<div class="sky" aria-hidden="true">
+  <div class="stars" id="stars3"></div>   <!-- дальний слой: звёзды по всему полю + периметр -->
+  <div class="stars" id="stars1"></div>   <!-- средний слой: мелкие звёзды у центра -->
+  <div class="stars" id="stars2"></div>   <!-- ближний слой: крупные звёзды у центра -->
+</div>
+
+<main class="app">
+
+  <!-- ============ ЭКРАН 1: НАСТРОЙКА ============ -->
+  <section class="screen active" id="screenInput">
+
+    <!-- Заголовок + декор: летящие Zzz слева, луна справа -->
+    <header class="header">
+      <span class="zzz" aria-hidden="true"><span>Z</span><span>z</span><span>z</span></span>
+
+      <div class="header-text">
+        <h1>Твой идеальный сон</h1>
+      </div>
+
+      <span class="moon-wrap" aria-hidden="true"><span class="moon"></span></span>
+    </header>
+
+    <!-- Переключатель режима: рассчитываем пробуждение или отбой -->
+    <div class="segmented" id="segmented">
+      <span class="seg-thumb" id="segThumb"></span> <!-- анимированный "ползунок" -->
+      <button class="seg active" data-mode="wake" type="button">Время пробуждения</button>
+      <button class="seg" data-mode="sleep" type="button">Отход ко сну</button>
+    </div>
+
+    <!-- Колесо времени: часы : минуты.
+         Каждая колонка окружена стрелками-степперами сверху и снизу,
+         также поддерживается перетаскивание мышью (см. JS). -->
+    <div class="picker">
+      <div class="wheel-col">
+        <button class="step-btn" data-step="hour" data-dir="1" type="button" aria-label="Увеличить часы">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 15l6-6 6 6"/>
+          </svg>
+        </button>
+        <div class="wheel" id="hourWheel" aria-label="Часы"></div>
+        <button class="step-btn" data-step="hour" data-dir="-1" type="button" aria-label="Уменьшить часы">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 9l6 6 6-6"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="colon">:</div>
+
+      <div class="wheel-col">
+        <button class="step-btn" data-step="min" data-dir="1" type="button" aria-label="Увеличить минуты">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 15l6-6 6 6"/>
+          </svg>
+        </button>
+        <div class="wheel" id="minWheel" aria-label="Минуты"></div>
+        <button class="step-btn" data-step="min" data-dir="-1" type="button" aria-label="Уменьшить минуты">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 9l6 6 6-6"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Кнопки выбора количества циклов сна -->
+    <div class="cycles" id="cycles">
+      <button class="cycle" data-c="4" type="button">
+        <span class="cycle-num">4</span><span class="cycle-label">Минимум</span>
+      </button>
+      <button class="cycle active" data-c="5" type="button">
+        <span class="cycle-num">5</span><span class="cycle-label">Оптимально</span>
+      </button>
+      <button class="cycle" data-c="6" type="button">
+        <span class="cycle-num">6</span><span class="cycle-label">Идеально</span>
+      </button>
+    </div>
+    <!-- Подпись "N циклов × 90 мин · X ч сна" (заполняется из JS) -->
+    <p class="cycles-hint" id="cyclesHint"></p>
+
+    <!-- Тоггл: добавлять ли +15 минут на засыпание -->
+    <button class="toggle-row" id="fallAsleep" type="button" aria-pressed="true">
+      <span>+ 15 мин на засыпание</span>
+      <span class="switch"></span>
+    </button>
+
+    <!-- Главная кнопка запуска расчёта -->
+    <button class="cta" id="calcBtn" type="button">Навстречу новому дню</button>
+  </section>
+
+  <!-- ============ ЭКРАН 2: РЕЗУЛЬТАТ ============ -->
+  <section class="screen" id="screenResult">
+    <!-- Крупное время + подпись + вторичное время в "чипе" -->
+    <div class="hero reveal">
+      <div class="hero-time" id="heroTime">07:30</div>
+      <p class="hero-label" id="heroLabel">Твое идеальное время пробуждения</p>
+      <div class="hero-chip"><span id="chipLabel">Отбой</span><b id="chipTime">23:00</b></div>
+    </div>
+
+    <!-- Трекер циклов (заполняется из JS: точки + линии) -->
+    <div class="tracker-card glass reveal">
+      <div class="tracker" id="tracker"></div>
+      <p class="tracker-caption" id="trackerCaption"></p>
+    </div>
+
+    <!-- СЕКЦИЯ СОВЕТОВ: 🌙 Вечерний ритуал -->
+    <div class="tips-block reveal">
+      <div class="tips-heading">
+        <span class="tips-heading-icon" aria-hidden="true">
+          <!-- Иконка "полумесяц" — вечер -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </span>
+        <span class="tips-heading-text">Вечерний ритуал</span>
+      </div>
+      <div class="cards" id="eveningCards"></div>
+    </div>
+
+    <!-- СЕКЦИЯ СОВЕТОВ: ☀️ Утренний ритуал -->
+    <div class="tips-block reveal">
+      <div class="tips-heading">
+        <span class="tips-heading-icon" aria-hidden="true">
+          <!-- Иконка "солнце" — утро -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+          </svg>
+        </span>
+        <span class="tips-heading-text">Утренний ритуал</span>
+      </div>
+      <div class="cards" id="morningCards"></div>
+    </div>
+
+    <!-- СЕКЦИЯ: ✨ Главный секрет (в том же стиле .tips-block, иконка — волшебная палочка) -->
+    <div class="tips-block reveal">
+      <div class="tips-heading">
+        <span class="tips-heading-icon" aria-hidden="true">
+          <!-- Иконка "волшебная палочка" (wand-2) — магия/секрет -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/>
+            <path d="m14 7 3 3"/>
+            <path d="M5 6v4"/>
+            <path d="M19 14v4"/>
+            <path d="M10 2v2"/>
+            <path d="M7 8H3"/>
+            <path d="M21 16h-4"/>
+            <path d="M11 3H9"/>
+          </svg>
+        </span>
+        <span class="tips-heading-text">Главный секрет</span>
+      </div>
+      <div class="cards">
+        <div class="tip-card glass">
+          <div class="tip-text">Качественный вечер гарантирует лёгкое утро, а правильное утро обеспечивает энергию для активного дня, который к вечеру принесёт здоровую усталость.</div>
+          <div class="tip-text">Попробуйте внедрять по одной–две новые привычки в неделю, чтобы они закрепились без стресса!</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Возврат на экран настройки -->
+    <button class="ghost-btn reveal" id="backBtn" type="button">Назад</button>
+  </section>
+
+</main>
+
+<script>
+/* IIFE — вся логика в изолированной области видимости, без глобальных переменных */
+(function () {
+  'use strict';
+
+  /* =====================================================
+     КОНСТАНТЫ И ДАННЫЕ
+  ===================================================== */
+  const ITEM_H   = 50;      // Высота строки колеса (синхронизирована с CSS --item-h)
+  const CYCLE    = 90;      // Длительность одного цикла сна, минут
+  const FALL_MIN = 15;      // Прибавка "на засыпание", минут
+  const DAY      = 1440;    // Минут в сутках (для модульной арифметики)
+
+  const HOURS   = Array.from({ length: 24 }, (_, i) => i);      // [0..23]
+  const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5);  // [0,5,10,...,55]
+
+  /* Единое состояние приложения */
+  const state = {
+    mode: 'wake',         // 'wake' — считаем от пробуждения, 'sleep' — считаем от отбоя
+    wake: 7 * 60 + 30,    // 07:30 по умолчанию
+    sleep: 23 * 60,       // 23:00 по умолчанию
+    cycles: 5,            // Кол-во циклов по умолчанию
+    fallAsleep: true      // Учитывать ли +15 мин на засыпание
+  };
+
+  /* =====================================================
+     УТИЛИТЫ
+  ===================================================== */
+  const pad = n => String(n).padStart(2, '0'); // "5" → "05"
+  const mod = (n, m) => ((n % m) + m) % m;     // Математический mod (всегда ≥ 0)
+  const fmtTime = mins => pad(Math.floor(mins / 60) % 24) + ':' + pad(mins % 60);
+
+  /* "90" → "1 ч 30 мин" (для подписи цикла) */
+  function formatDuration(mins) {
+    const h = Math.floor(mins / 60), m = mins % 60;
+    return m === 0 ? h + ' ч' : h + ' ч ' + m + ' мин';
+  }
+  /* Правильное склонение слова "цикл" по числу */
+  function cyclesWord(n) {
+    const n10 = n % 10, n100 = n % 100;
+    if (n10 === 1 && n100 !== 11) return 'цикл';
+    if (n10 >= 2 && n10 <= 4 && (n100 < 10 || n100 >= 20)) return 'цикла';
+    return 'циклов';
+  }
+
+  /* =====================================================
+     БАЗА СОВЕТОВ (24 шт.: 12 вечерних + 12 утренних)
+     Текст взят дословно из исходного файла. Абзацы
+     разделены символом \n и рендерятся отдельными .tip-text.
+  ===================================================== */
+  const EVENING_TIPS = [
+    { title: 'Снизьте температуру в комнате до 18–20 °C',
+      text:  'Прохлада помогает снизить температуру тела, что является естественным сигналом для мозга о начале сна.' },
+    { title: 'Отложите гаджеты за 30–60 мин до сна',
+      text:  'Синий свет экранов блокирует выработку мелатонина (гормона сна).\nЗамените скроллинг на чтение книг.' },
+    { title: 'Соблюдайте «циркадный режим»',
+      text:  'Старайтесь ложиться спать и просыпаться в одно и то же время (± 30 минут) даже в выходные.\nЭто настраивает ваши внутренние биологические часы, и со временем вы начнёте засыпать без усилий.' },
+    { title: 'Приглушите свет за 1,5–2 часа до сна',
+      text:  'Выключите верхний свет, используйте торшеры или тёплый рассеянный свет, чтобы стимулировать выработку мелатонина.' },
+    { title: 'Правило кофеина и алкоголя',
+      text:  'Откажитесь от кофеина (кофе, чай, энергетики, шоколад) минимум за 8 часов до сна.\nАлкоголь помогает быстрее уснуть, но разрушает фазу глубокого сна, из-за чего вы проснётесь разбитым.' },
+    { title: 'Лёгкий ужин за 2–3 часа до сна',
+      text:  'Тяжёлая, жирная или острая пища заставит ЖКТ работать вместо того, чтобы отдыхать, что может вызвать изжогу и поверхностный сон.' },
+    { title: 'Создайте «ритуал» замедления',
+      text:  'Если вы не можете уснуть из-за мыслей о завтрашнем дне, попробуйте сделать лёгкую растяжку, помедитировать или взять блокнот и записать все задачи и тревоги.\nМозг расслабится, понимая, что ничего не забыто, и перестанет прокручивать мысли в голове.' },
+    { title: 'Примите тёплый душ или ванну',
+      text:  'Когда вы выходите из тёплой ванной в прохладную спальню, температура вашего тела резко падает — это мощный физиологический триггер для быстрого засыпания.' },
+    { title: 'Кровать — только для сна',
+      text:  'Не работайте, не ешьте и не смотрите сериалы в постели.\nМозг должен ассоциировать кровать исключительно с отдыхом.' },
+    { title: 'Обеспечьте абсолютную темноту',
+      text:  'Используйте шторы блэкаут (светонепроницаемые) или удобную маску для сна.\nДаже свет от уличного фонаря или диода на телевизоре мешает глубокому сну.\nМелатонин вырабатывается только в абсолютной темноте.' },
+    { title: 'Белый шум или беруши',
+      text:  'Если вы живёте в шумном районе или с кем-то, кто храпит, используйте беруши или включите звук дождя/вентилятора, чтобы скрыть резкие звуковые перепады.' },
+    { title: 'Проветривайте спальню',
+      text:  'Свежий воздух и оптимальная влажность (около 40–60%) предотвращают сухость слизистых, храп и частые микропробуждения среди ночи.' }
+  ];
+
+  const MORNING_TIPS = [
+    { title: 'Выпейте стакан тёплой воды сразу после пробуждения',
+      text:  'За ночь организм теряет влагу с дыханием и потоотделением.\nВода запускает метаболизм и работу ЖКТ.' },
+    { title: 'Никакой кнопки «Отложить» на будильнике',
+      text:  'Дробление сна на отрезки по 5–10 минут запускает новый цикл сна, который вы тут же прерываете.\nЭто вызывает «инерцию сна» — состояние сильной разбитости и тумана в голове на полдня.' },
+    { title: 'Быстрый подъём',
+      text:  'Уберите будильник подальше. Положите телефон или часы в другой конец комнаты.\nЧтобы выключить звук, вам придётся физически встать с кровати, что сразу снизит желание снова залезть под одеяло.' },
+    { title: 'Используйте «Правило 5 секунд»',
+      text:  'Как только прозвенел будильник и вы осознали, что пора вставать, мысленно посчитайте в обратном порядке: 5–4–3–2–1, и на счёт «1» физически поднимите себя с кровати.\nЭтот простой психологический приём прерывает цикл внутренних переговоров и не даёт мозгу времени на то, чтобы придумать убедительное оправдание остаться под одеялом ещё на «5 минуточек».' },
+    { title: 'Отложите смартфон на первые 30–60 минут',
+      text:  'Проверка почты, новостей и соцсетей с утра вызывает всплеск дешёвого дофамина и стрессового кортизола, переводя мозг в режим реактивности и тревоги ещё до того, как вы встали с кровати.' },
+    { title: 'Получите порцию яркого света',
+      text:  'Сразу после пробуждения откройте шторы, выйдите на балкон или включите яркий холодный свет.\nСвет попадает на сетчатку глаза и даёт команду мозгу прекратить выработку мелатонина и начать вырабатывать кортизол (гормон бодрости).' },
+    { title: 'Умойтесь прохладной водой',
+      text:  'Прохлада стимулирует блуждающий нерв и тонизирует сосуды, помогая окончательно сбросить сонливость.' },
+    { title: 'Сделайте лёгкую растяжку или лимфодренаж',
+      text:  'Всего 5–10 минут простых движений (потягивания, наклоны, прыжки, простукивания пятками) разгоняют лимфу, убирают утреннюю отёчность, возвращают тонус телу и насыщают мозг кислородом.' },
+    { title: 'Застелите постель',
+      text:  'Это простая привычка даёт мозгу первую «маленькую победу» за день и ставит психологическую точку: время сна прошло, день начался.' },
+    { title: 'Сбалансированный завтрак',
+      text:  'Вместо сладких хлопьев или круассанов (которые вызовут скачок сахара и последующую сонливость) отдайте предпочтение белкам, полезным жирам и сложным углеводам (яйца, авокадо, овощи, цельнозерновые тосты).\nЭто обеспечит стабильный уровень сахара в крови и долгую энергию без сонливости.' },
+    { title: 'Первая чашка кофе/чая через 60–90 минут после пробуждения',
+      text:  'Утром в организме ещё много аденозина (молекулы усталости). Кофеин не удаляет его, а лишь временно блокирует рецепторы.\nЕсли выпить сразу, после спада действия кофеина может наступить резкий упадок сил.\nЕсли подождать, организм успевает естественно снизить аденозин, и напиток даёт более плавный и длительный заряд бодрости.\nВ чае кофеина в 2–3 раза меньше, чем в кофе, плюс есть L-теанин, поэтому эффект мягче, но принцип тот же. Исключение: травяные чаи — ромашка, мята, иван-чай, ройбуш, каркаде — кофеина не содержат. Их можно пить сразу после пробуждения.' },
+    { title: 'Настройте фокус на день',
+      text:  'Пока завтракаете, подумайте о 1–3 главных задачах на сегодня или запишите их.\nЭто задаст вектор продуктивности и снизит утреннюю тревожность перед неизвестностью.' }
+  ];
+
+  /* =====================================================
+     ПУЛ СОВЕТОВ БЕЗ ПОВТОРОВ
+     Выдаёт случайные советы из категории. Когда пул
+     исчерпан — перемешивает заново (Фишер–Йетс), при этом
+     первый совет новой серии не совпадает с последним
+     выданным в предыдущей — так один и тот же совет не
+     выпадает два расчёта подряд.
+  ===================================================== */
+  function makeTipPool(tips) {
+    let queue = [];       // очередь ещё не выданных индексов
+    let lastIdx = -1;     // индекс последнего выданного совета
+
+    return {
+      draw(count) {
+        const out = [];
+        for (let i = 0; i < count; i++) {
+          if (queue.length === 0) {
+            // Пересобираем и перемешиваем пул
+            queue = tips.map((_, idx) => idx);
+            for (let j = queue.length - 1; j > 0; j--) {
+              const k = Math.floor(Math.random() * (j + 1));
+              const t = queue[j]; queue[j] = queue[k]; queue[k] = t;
+            }
+            // Не допускаем, чтобы первый совет новой серии совпал с последним старым
+            if (queue[0] === lastIdx && queue.length > 1) {
+              const t = queue[0]; queue[0] = queue[1]; queue[1] = t;
+            }
+          }
+          const idx = queue.shift();
+          lastIdx = idx;
+          out.push(tips[idx]);
+        }
+        return out;
+      }
+    };
+  }
+
+  const eveningPool = makeTipPool(EVENING_TIPS);
+  const morningPool = makeTipPool(MORNING_TIPS);
+
+  /* =====================================================
+     ЗВЁЗДЫ
+     Каждый слой — либо "кластеры" у центра (для параллакса),
+     либо равномерное поле по всей площади с уклоном к периметру.
+  ===================================================== */
+  function seedStars(container, count, opts) {
+    const frag = document.createDocumentFragment();
+    const clusterCount = opts.clusters || 5;
+
+    // Приближение нормального распределения (сумма трёх равномерных − 1.5)
+    const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5);
+
+    // Функция «расталкивания» к краям: u<0.5 тянем к 0, u>0.5 — к 1.
+    // bias = 1 — обычное равномерное; bias > 1 — плотнее у периметра.
+    const edgeSpread = (u, bias) => {
+      if (bias === 1) return u;
+      return u < 0.5
+        ? 0.5 * Math.pow(2 * u, bias)
+        : 1 - 0.5 * Math.pow(2 * (1 - u), bias);
+    };
+
+    // Центры кластеров (сгруппированы ближе к центру экрана)
+    const clusters = [];
+    for (let c = 0; c < clusterCount; c++) {
+      clusters.push({
+        x: 50 + gauss() * opts.centerSpreadX,  // % по X
+        y: 46 + gauss() * opts.centerSpreadY,  // % по Y
+        r: opts.spread                         // радиус разброса
+      });
+    }
+
+    for (let i = 0; i < count; i++) {
+      let left, top;
+
+      if (opts.uniform) {
+        // Равномерно по всему полю (включая края и углы),
+        // с опциональным уклоном к периметру через edgeBias.
+        const bias = opts.edgeBias || 1;
+        left = edgeSpread(Math.random(), bias) * 100;
+        top  = edgeSpread(Math.random(), bias) * 100;
+      } else {
+        const c = clusters[i % clusterCount];               // равномерно по кластерам
+        const ang  = Math.random() * Math.PI * 2;           // случайный угол
+        const dist = Math.pow(Math.random(), 0.6) * c.r;    // смещение к центру кластера
+
+        left = Math.min(99, Math.max(1, c.x + Math.cos(ang) * dist));
+        top  = Math.min(99, Math.max(1, c.y + Math.sin(ang) * dist));
+      }
+
+      const s = document.createElement('span');
+      s.className = 'star';
+
+      const size   = opts.min + Math.random() * (opts.max - opts.min);
+      const accent = opts.accent && Math.random() < opts.accent; // часть звёзд — акцентные (тёплые)
+      const color  = accent ? '#F4E4BC' : '#8A95C0';
+
+      s.style.width  = size.toFixed(2) + 'px';
+      s.style.height = size.toFixed(2) + 'px';
+      s.style.left   = left.toFixed(3) + '%';
+      s.style.top    = top.toFixed(3) + '%';
+      s.style.background = color;
+      s.style.boxShadow = '0 0 ' + (size * 3).toFixed(1) + 'px ' +
+        (accent ? 'rgba(244,228,188,.85)' : 'rgba(138,149,192,.75)');
+      // Случайные задержка и длительность мерцания — чтобы звёзды мигали вразнобой
+      s.style.animationDelay    = (Math.random() * 5).toFixed(2) + 's';
+      s.style.animationDuration = (2.4 + Math.random() * 3.6).toFixed(2) + 's';
+
+      frag.appendChild(s);
+    }
+    container.appendChild(frag);
+  }
+
+  // Дальний слой: равномерно по всей площади с уклоном к периметру.
+  // Именно он закрывает пустые зоны по краям на широких экранах.
+  seedStars(document.getElementById('stars3'), 130, {
+    min: 0.9, max: 2.4, accent: 0.12,
+    uniform: true, edgeBias: 1.6
+  });
+
+  // Слой 1: много мелких звёзд, плотное центральное скопление
+  seedStars(document.getElementById('stars1'), 140, {
+    min: 0.8, max: 2.1, accent: 0.05,
+    clusters: 7, spread: 13,
+    centerSpreadX: 30, centerSpreadY: 26
+  });
+  // Слой 2: меньше, но крупнее, ещё плотнее к центру
+  seedStars(document.getElementById('stars2'), 55, {
+    min: 1.6, max: 3.2, accent: 0.20,
+    clusters: 10, spread: 80,
+    centerSpreadX: 25, centerSpreadY: 54
+  });
+
+  /* =====================================================
+     ПАРАЛЛАКС ЗВЁЗД
+     Работает только при точном указателе (мышь/трекпад),
+     чтобы не мешать на тачах. Три слоя двигаются с разной скоростью.
+  ===================================================== */
+  (function parallax() {
+    const fine = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
+    if (!fine) return; // на тач-устройствах отключаем
+
+    const layers = [
+      { el: document.getElementById('stars3'), depth: 6  }, // самый дальний (двигается слабее всех)
+      { el: document.getElementById('stars1'), depth: 10 }, // средний
+      { el: document.getElementById('stars2'), depth: 18 }  // ближний (двигается сильнее)
+    ];
+    let tx = 0, ty = 0, cx = 0, cy = 0;
+
+    // Запоминаем "целевую" позицию курсора (нормированную -0.5..0.5)
+    window.addEventListener('pointermove', e => {
+      tx = (e.clientX / window.innerWidth  - 0.5);
+      ty = (e.clientY / window.innerHeight - 0.5);
+    }, { passive: true });
+
+    // Плавное сглаживание и применение трансформации через rAF
+    (function loop() {
+      cx += (tx - cx) * 0.06; // инерция/сглаживание
+      cy += (ty - cy) * 0.06;
+      for (let i = 0; i < layers.length; i++) {
+        const l = layers[i];
+        l.el.style.transform =
+          'translate3d(' + (-cx * l.depth).toFixed(2) + 'px,' + (-cy * l.depth).toFixed(2) + 'px,0)';
+      }
+      requestAnimationFrame(loop);
+    })();
+  })();
+
+  /* =====================================================
+     КОЛЕСО ВРЕМЕНИ (часы и минуты)
+     makeWheel создаёт список элементов и следит за "активным"
+     (тем, что по центру). Скролл привязан к CSS scroll-snap.
+  ===================================================== */
+  function makeWheel(el, values, format) {
+    el.innerHTML = values
+      .map(v => '<div class="wheel-item">' + format(v) + '</div>')
+      .join('');
+
+    const items = Array.prototype.slice.call(el.children);
+    let current = -1;   // индекс активного (кэш, чтобы не перерисовывать зря)
+    let raf = null;     // id кадра rAF
+
+    // Индекс ближайшего к центру элемента (по позиции скролла)
+    const clampIdx = () => Math.max(0, Math.min(values.length - 1, Math.round(el.scrollTop / ITEM_H)));
+
+    /* Переключить класс active на нужном элементе */
+    function paint(idx) {
+      if (idx === current) return;
+      current = idx;
+      for (let i = 0; i < items.length; i++) {
+        items[i].classList.toggle('active', i === idx);
+      }
+    }
+
+    /* Обновляем активный элемент с throttling через rAF */
+    function onScroll() {
+      if (raf) return;
+      raf = requestAnimationFrame(() => { raf = null; paint(clampIdx()); });
+    }
+
+    el.addEventListener('scroll', onScroll, { passive: true });
+
+    // Клик по строке — мгновенно прокрутить к ней
+    items.forEach((item, i) => {
+      item.addEventListener('click', () => setIndex(i, true));
+    });
+
+    /* Программная установка позиции (используется при init и смене режима) */
+    function setIndex(i, smooth) {
+      i = Math.max(0, Math.min(values.length - 1, i));
+      current = -1;      // форсируем перерисовку
+      paint(i);
+      if (smooth && el.scrollTo) {
+        el.scrollTo({ top: i * ITEM_H, behavior: 'smooth' });
+      } else {
+        el.scrollTop = i * ITEM_H;
+      }
+    }
+
+    /* Текущее значение колеса */
+    function getValue() {
+      return values[clampIdx()];
+    }
+    /* Текущий индекс активной строки */
+    function getIndex() {
+      return clampIdx();
+    }
+
+    return { el, setIndex, getValue, getIndex, values };
+  }
+
+  const hourWheel = makeWheel(document.getElementById('hourWheel'), HOURS, pad);
+  const minWheel  = makeWheel(document.getElementById('minWheel'),  MINUTES, pad);
+
+  /* =====================================================
+     ПЕРЕТАСКИВАНИЕ КОЛЕСА МЫШЬЮ
+     Работает только для pointerType === 'mouse', чтобы не мешать
+     нативному touch-скроллу на смартфонах. На время drag отключаем
+     scroll-snap, при отпускании — плавно "докидываем" до ближайшего.
+  ===================================================== */
+  function enableDragScroll(el) {
+    let dragging = false;
+    let startY = 0;
+    let startTop = 0;
+    let moved = false; // был ли реальный сдвиг (чтобы погасить случайный клик)
+
+    el.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'mouse') return; // тач — нативный скролл
+      if (e.button !== 0) return;            // только левой кнопкой
+      dragging = true;
+      moved = false;
+      startY = e.clientY;
+      startTop = el.scrollTop;
+      el.classList.add('dragging');
+      try { el.setPointerCapture(e.pointerId); } catch (_) {}
+      e.preventDefault();
+    });
+
+    el.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const dy = e.clientY - startY;
+      if (Math.abs(dy) > 3) moved = true;   // порог, чтобы отличить клик от drag
+      el.scrollTop = startTop - dy;
+    });
+
+    function endDrag(e) {
+      if (!dragging) return;
+      dragging = false;
+      el.classList.remove('dragging');
+      try { if (e && e.pointerId != null) el.releasePointerCapture(e.pointerId); } catch (_) {}
+      // Мягко докидываем к ближайшей позиции
+      const len = el.children.length;
+      const idx = Math.max(0, Math.min(len - 1, Math.round(el.scrollTop / ITEM_H)));
+      el.scrollTo({ top: idx * ITEM_H, behavior: 'smooth' });
+    }
+
+    el.addEventListener('pointerup', endDrag);
+    el.addEventListener('pointercancel', endDrag);
+
+    // Гасим клик по элементу, если это был drag, чтобы случайно не перескочить
+    el.addEventListener('click', (e) => {
+      if (moved) {
+        e.stopPropagation();
+        e.preventDefault();
+        moved = false;
+      }
+    }, true);
+  }
+
+  enableDragScroll(hourWheel.el);
+  enableDragScroll(minWheel.el);
+
+  /* =====================================================
+     «ПУСТЫЕ» ЗОНЫ ВОКРУГ КОЛЁС (.picker)
+     Если палец не попал точно по цифре (левее/правее, по двоеточию,
+     по зоне стрелок) — жест всё равно вращает ближайшее колесо,
+     а не прокручивает страницу.
+  ===================================================== */
+  function enablePickerDrag(picker, wheels) {
+    let drag = null;   // активное перетаскивание
+
+    /* Ближайшее колесо по горизонтали */
+    function wheelByX(x) {
+      let best = wheels[0];
+      let bestDist = Infinity;
+      for (let i = 0; i < wheels.length; i++) {
+        const r = wheels[i].el.getBoundingClientRect();
+        const d = Math.abs(x - (r.left + r.width / 2));
+        if (d < bestDist) { bestDist = d; best = wheels[i]; }
+      }
+      return best;
+    }
+
+    /* Гасим «хвостовой» клик после перетаскивания */
+    function swallowClick(e) { e.stopPropagation(); e.preventDefault(); }
+
+    picker.addEventListener('pointerdown', (e) => {
+      // Палец на самом колесе — там работает нативный скролл (touch)
+      // или enableDragScroll (мышь). Не вмешиваемся.
+      if (e.target && e.target.closest && e.target.closest('.wheel')) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+      const w = wheelByX(e.clientX);
+      drag = {
+        wheel: w,
+        id: e.pointerId,
+        startY: e.clientY,
+        startTop: w.el.scrollTop,
+        moved: false
+      };
+    });
+
+    picker.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+
+      const dy = e.clientY - drag.startY;
+
+      if (!drag.moved) {
+        if (Math.abs(dy) < 4) return;              // порог «тап → свайп»
+        drag.moved = true;
+        drag.wheel.el.classList.add('dragging');   // отключаем scroll-snap на время жеста
+        try { picker.setPointerCapture(e.pointerId); } catch (_) {}
+      }
+
+      drag.wheel.el.scrollTop = drag.startTop - dy;
+    });
+
+    function endDrag(e) {
+      if (!drag) return;
+      if (e && e.pointerId != null && e.pointerId !== drag.id) return;
+
+      const w = drag.wheel;
+
+      if (drag.moved) {
+        w.el.classList.remove('dragging');
+
+        // Докидываем до ближайшей строки
+        const len = w.values.length;
+        const idx = Math.max(0, Math.min(len - 1, Math.round(w.el.scrollTop / ITEM_H)));
+        w.el.scrollTo({ top: idx * ITEM_H, behavior: 'smooth' });
+
+        // После свайпа клик не нужен (иначе стрелка шагнёт ещё раз)
+        picker.addEventListener('click', swallowClick, { capture: true, once: true });
+        setTimeout(() => picker.removeEventListener('click', swallowClick, true), 400);
+
+        try { picker.releasePointerCapture(drag.id); } catch (_) {}
+      }
+
+      drag = null;
+    }
+
+    picker.addEventListener('pointerup', endDrag);
+    picker.addEventListener('pointercancel', endDrag);
+
+    // Страховка: жест из «пустой» зоны не должен прокручивать страницу
+    picker.addEventListener('touchmove', (e) => {
+      if (drag) e.preventDefault();
+    }, { passive: false });
+  }
+
+  enablePickerDrag(document.querySelector('.picker'), [hourWheel, minWheel]);
+
+  /* =====================================================
+     СТЕППЕР-СТРЕЛКИ (шаг ±1 по колонке, с переходом через край)
+  ===================================================== */
+  const stepButtons = Array.prototype.slice.call(document.querySelectorAll('.step-btn'));
+  stepButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const wheel = btn.dataset.step === 'hour' ? hourWheel : minWheel;
+      const dir = parseInt(btn.dataset.dir, 10) || 0;
+      const len = wheel.values.length;
+      let idx = wheel.getIndex() + dir;
+      if (idx < 0) idx = len - 1;     // 00 → 23 для часов, 00 → 55 для минут
+      if (idx >= len) idx = 0;        // 23 → 00, 55 → 00
+      wheel.setIndex(idx, true);      // плавная прокрутка к новому значению
+    });
+  });
+
+  /* =====================================================
+     ССЫЛКИ НА DOM-ЭЛЕМЕНТЫ (чтобы не искать их каждый раз)
+  ===================================================== */
+  const screenInput   = document.getElementById('screenInput');
+  const screenResult  = document.getElementById('screenResult');
+  const segmented     = document.getElementById('segmented');
+  const segThumb      = document.getElementById('segThumb');
+  const segButtons    = Array.prototype.slice.call(segmented.querySelectorAll('.seg'));
+  const cycleButtons  = Array.prototype.slice.call(document.querySelectorAll('.cycle'));
+  const cyclesHint    = document.getElementById('cyclesHint');
+  const fallAsleepBtn = document.getElementById('fallAsleep');
+  const calcBtn       = document.getElementById('calcBtn');
+  const backBtn       = document.getElementById('backBtn');
+
+  const heroTime      = document.getElementById('heroTime');
+  const heroLabel     = document.getElementById('heroLabel');
+  const chipLabel     = document.getElementById('chipLabel');
+  const chipTime      = document.getElementById('chipTime');
+  const tracker       = document.getElementById('tracker');
+  const trackerCaption= document.getElementById('trackerCaption');
+
+  const eveningCards  = document.getElementById('eveningCards');
+  const morningCards  = document.getElementById('morningCards');
+
+  /* =====================================================
+     ЛОГИКА ВРЕМЕНИ (сохранение/загрузка в state)
+  ===================================================== */
+  /* Считываем время с колёс и сохраняем в текущий режим */
+  function saveCurrentTime() {
+    const mins = hourWheel.getValue() * 60 + minWheel.getValue();
+    state[state.mode] = mins;
+  }
+
+  /* Округляем минуты до шага 5 и ставим колёса в нужное положение */
+  function loadTime(mins, smooth) {
+    const h = Math.floor(mins / 60) % 24;
+    const m = mod(Math.round((mins % 60) / 5) * 5, 60);
+    hourWheel.setIndex(HOURS.indexOf(h), smooth);
+    minWheel.setIndex(MINUTES.indexOf(m), smooth);
+  }
+
+  /* Обновляем подпись "N циклов × 90 мин · X ч сна" */
+  function updateCyclesHint() {
+    const total = state.cycles * CYCLE;
+    cyclesHint.innerHTML =
+      '<b>' + state.cycles + ' ' + cyclesWord(state.cycles) + ' × 90 мин</b> · ' +
+      formatDuration(total) + ' сна';
+  }
+
+  /* =====================================================
+     ПЕРЕКЛЮЧАТЕЛЬ РЕЖИМА (wake ⇄ sleep)
+  ===================================================== */
+  segButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.mode;
+      if (mode === state.mode) return; // уже выбран
+
+      saveCurrentTime();               // сохраняем в старый режим
+      state.mode = mode;
+
+      // Подсветка активного сегмента + сдвиг "ползунка"
+      segButtons.forEach(b => b.classList.toggle('active', b === btn));
+      segThumb.style.transform = mode === 'wake' ? 'translateX(0)' : 'translateX(100%)';
+
+      // Загружаем сохранённое время для нового режима (плавно)
+      loadTime(state[mode], true);
+    });
+  });
+
+  /* =====================================================
+     ВЫБОР ЧИСЛА ЦИКЛОВ (4 / 5 / 6)
+  ===================================================== */
+  cycleButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.cycles = parseInt(btn.dataset.c, 10);
+      cycleButtons.forEach(b => b.classList.toggle('active', b === btn));
+      updateCyclesHint();
+    });
+  });
+
+  /* =====================================================
+     ТОГГЛ "+15 МИН НА ЗАСЫПАНИЕ"
+  ===================================================== */
+  fallAsleepBtn.addEventListener('click', () => {
+    state.fallAsleep = !state.fallAsleep;
+    // Меняем aria-pressed — по нему CSS рисует включённое/выключенное состояние
+    fallAsleepBtn.setAttribute('aria-pressed', String(state.fallAsleep));
+  });
+
+  /* =====================================================
+     ТРЕКЕР ЦИКЛОВ (визуализация: точки + линии между ними)
+  ===================================================== */
+  function renderTracker(count) {
+    tracker.innerHTML = '';
+    for (let i = 0; i < count; i++) {
+      if (i > 0) {
+        // Связующая линия перед текущей точкой
+        const line = document.createElement('span');
+        line.className = 'track-line';
+        line.style.animationDelay = (0.08 + i * 0.09) + 's';
+        tracker.appendChild(line);
+      }
+      // Точка цикла
+      const dot = document.createElement('span');
+      dot.className = 'track-dot' + (i === count - 1 ? ' final' : '');
+      if (i !== count - 1) dot.style.animationDelay = (0.06 + i * 0.09) + 's';
+      tracker.appendChild(dot);
+    }
+  }
+
+  /* =====================================================
+     РЕНДЕР СОВЕТОВ
+     При каждом расчёте берём ровно 1 случайный совет из
+     вечернего пула и ровно 1 — из утреннего. Алгоритм тот же:
+     ни один совет не повторяется, пока не будут выданы все 12
+     в категории; между сериями соседние повторы исключены.
+  ===================================================== */
+  function tipsToHTML(tips) {
+    return tips.map(t =>
+      '<div class="tip-card glass">' +
+        '<div class="tip-title">' + t.title + '</div>' +
+        t.text.split('\n').map(p => '<div class="tip-text">' + p + '</div>').join('') +
+      '</div>'
+    ).join('');
+  }
+
+  function renderTips() {
+    eveningCards.innerHTML = tipsToHTML(eveningPool.draw(1));
+    morningCards.innerHTML = tipsToHTML(morningPool.draw(1));
+  }
+
+  /* =====================================================
+     ГЛАВНЫЙ РАСЧЁТ
+     wake-режим:  отбой = пробуждение − (циклы×90 + засыпание)
+     sleep-режим: пробуждение = отбой + засыпание + циклы×90
+  ===================================================== */
+  function calculate() {
+    saveCurrentTime();
+
+    const fall   = state.fallAsleep ? FALL_MIN : 0;
+    const sleep  = state.cycles * CYCLE;
+    const cycles = state.cycles;
+
+    let main, mainLabel, otherTime, otherLabel;
+
+    if (state.mode === 'wake') {
+      const wake = state.wake;
+      main       = mod(wake - sleep - fall, DAY); // считаем отбой
+      mainLabel  = 'Твой идеальный момент отхода ко сну';
+      otherTime  = wake;
+      otherLabel = 'Пробуждение';
+    } else {
+      const bed  = state.sleep;
+      main       = mod(bed + fall + sleep, DAY); // считаем пробуждение
+      mainLabel  = 'Твое идеальное время пробуждения';
+      otherTime  = bed;
+      otherLabel = 'Отбой';
+    }
+
+    /* Заполняем "hero" и "чип" */
+    heroTime.textContent  = fmtTime(main);
+    heroLabel.textContent = mainLabel;
+    chipLabel.textContent = otherLabel;
+    chipTime.textContent  = fmtTime(otherTime);
+
+    /* Отрисовываем трекер и его подпись */
+    renderTracker(cycles);
+    trackerCaption.textContent =
+      cycles + ' ' + cyclesWord(cycles) + ' × 90 мин · ' + formatDuration(sleep);
+
+    /* Выдаём по одному совету из каждой категории (без повторов подряд) */
+    renderTips();
+
+    /* Переключаем экран */
+    screenInput.classList.remove('active');
+    screenResult.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  calcBtn.addEventListener('click', calculate);
+
+  /* Кнопка "Рассчитать снова" — возвращает на первый экран */
+  backBtn.addEventListener('click', () => {
+    screenResult.classList.remove('active');
+    screenInput.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  /* =====================================================
+     ИНИЦИАЛИЗАЦИЯ
+  ===================================================== */
+  requestAnimationFrame(() => {
+    loadTime(state.wake, false); // стартовое время на колёсах
+    updateCyclesHint();          // стартовая подпись циклов
+  });
+
+  /* Пересчёт положения колеса ТОЛЬКО при изменении ширины окна.
+     На мобильных скролл меняет высоту (адресная строка), колесо
+     дёргать в этот момент нельзя — оно бы "слетало" на позицию 0. */
+  let lastWidth = window.innerWidth;
+  window.addEventListener('resize', () => {
+    if (window.innerWidth === lastWidth) return;
+    lastWidth = window.innerWidth;
+    if (screenInput.classList.contains('active')) {
+      loadTime(state[state.mode], false);
+    }
+  });
+})();
+</script>
+</body>
+</html>
